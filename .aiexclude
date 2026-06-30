@@ -1,0 +1,24 @@
+# Python virtual environment folder
+venv/
+
+# Caches and artifacts
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local data and vector database storage
+# These can contain large files not needed for code intelligence.
+data/
+qdrant_storage/
+
+# Common build and distribution folders
+build/
+dist/
+*.egg-info/
+
+# Version control system folder
+.git/
+
+# IDE/Editor-specific settings
+.vscode/
+.idea/
