@@ -7,6 +7,10 @@ services:
       - "6334:6334"
     volumes:
       - ./qdrant_storage:/qdrant/storage:z
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
   postgres:
     image: postgres:15
     environment:
@@ -17,3 +21,43 @@ services:
       - "5432:5432"
     volumes:
       - ./pg_data:/var/lib/postgresql/data
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/enterprise_copilot
+      - QDRANT_URL=http://qdrant:6333
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:80,http://localhost
+      - REDIS_URL=redis://redis:6379/0
+      - LANGCHAIN_TRACING_V2=true
+      - LANGCHAIN_PROJECT=EnterpriseCopilot
+      - LANGCHAIN_API_KEY=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
+    
+    depends_on:
+      - postgres
+      - qdrant
+      - redis
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/enterprise_copilot
+      - QDRANT_URL=http://qdrant:6333
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+      - postgres
+      - qdrant
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

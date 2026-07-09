@@ -17,31 +17,60 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Add CORS middleware
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Setup dynamic CORS based on env var
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to specific origins
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+import redis.asyncio as redis
+from fastapi_limiter import FastAPILimiter
+
+# We will initialize FastAPILimiter in the startup event.
+
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException
-from app.exceptions import TicketNotFoundError, InvalidStateError
+from app.exceptions import TicketNotFoundError, InvalidStateError, DatabaseError, AIProcessingError
 
 @app.exception_handler(TicketNotFoundError)
 async def ticket_not_found_exception_handler(request: Request, exc: TicketNotFoundError):
     return JSONResponse(
         status_code=404,
-        content={"error": "Not Found", "message": exc.message},
+        content={"status": "error", "error": "Not Found", "message": exc.message},
     )
 
 @app.exception_handler(InvalidStateError)
 async def invalid_state_exception_handler(request: Request, exc: InvalidStateError):
     return JSONResponse(
         status_code=400,
-        content={"error": "Bad Request", "message": exc.message},
+        content={"status": "error", "error": "Bad Request", "message": exc.message},
+    )
+
+@app.exception_handler(DatabaseError)
+async def database_error_exception_handler(request: Request, exc: DatabaseError):
+    logger.error(f"Database Error: {exc.message}")
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "error": "Database Error", "message": exc.message},
+    )
+
+@app.exception_handler(AIProcessingError)
+async def ai_error_exception_handler(request: Request, exc: AIProcessingError):
+    logger.error(f"AI Processing Error: {exc.message}")
+    return JSONResponse(
+        status_code=502,
+        content={"status": "error", "error": "AI Processing Error", "message": exc.message},
     )
 
 @app.exception_handler(Exception)
@@ -49,35 +78,20 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled Exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"error": "Internal Server Error", "message": "An unexpected error occurred. Please try again later."},
+        content={"status": "error", "error": "Internal Server Error", "message": "An unexpected error occurred. Please try again later."},
     )
 
-# Startup event to initialize the vector collection and database
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the Qdrant collection and DB on startup."""
+    """Initialize the Qdrant collection, DB, and Redis Rate Limiter on startup."""
     try:
-        # Create database tables
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables verified/created successfully.")
-        
-        # Seed default admin user if none exists
-        from app.database import SessionLocal
-        from app.models import AdminUser
-        from app.services.auth_service import AuthService
-        db = SessionLocal()
-        try:
-            if db.query(AdminUser).count() == 0:
-                logger.info("No AdminUser found, creating default admin user...")
-                default_admin = AdminUser(
-                    username="admin",
-                    hashed_password=AuthService.get_password_hash("password123")
-                )
-                db.add(default_admin)
-                db.commit()
-                logger.info("Default admin user created successfully.")
-        finally:
-            db.close()
+        # Initialize Redis for rate limiting
+        redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+        redis_conn = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+        await FastAPILimiter.init(redis_conn)
+        logger.info("Redis Rate Limiter initialized successfully")
+
+        logger.info("Database verification delegated to Alembic migrations.")
         
         # Run the synchronous I/O-bound function in a worker thread
         # to avoid blocking the main event loop.

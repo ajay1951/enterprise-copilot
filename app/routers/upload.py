@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from app.schemas import DocumentUploadResponse
-from app.vector_store import ingest_document
-import anyio
+from app.worker import process_document_task
 import logging
 import os
 import shutil
@@ -29,17 +28,15 @@ async def upload_document(
             
         doc_title = title or file.filename.split('.')[0].replace('_', ' ').title()
         
-        # Run the ingestion in a background thread
-        await anyio.to_thread.run_sync(
-            ingest_document, 
-            doc_title, 
-            temp_file_path,
-            file.filename
+        # Trigger the Celery background task
+        process_document_task.delay(
+            title=doc_title, 
+            file_path=temp_file_path,
+            filename=file.filename
         )
         
-        # Clean up temp file after ingestion
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        # Note: We DO NOT remove the temp file here because the Celery worker
+        # needs to read it. The worker will delete it when finished.
         
         return DocumentUploadResponse(
             message=f"Document '{doc_title}' uploaded and ingested successfully.",
