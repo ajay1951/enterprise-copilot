@@ -34,8 +34,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - LANGCHAIN_TRACING_V2=true
       - LANGCHAIN_PROJECT=EnterpriseCopilot
-      - LANGCHAIN_API_KEY=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
-    
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
     depends_on:
       - postgres
       - qdrant

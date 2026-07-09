@@ -32,13 +32,8 @@ llm_common_kwargs = {
     **({"base_url": OPENROUTER_BASE_URL} if USE_OPENROUTER else {}),
 }
 
-# Create primary and fallback LLM instances
-primary_llm = ChatOpenAI(model=LLM_MODEL, **llm_common_kwargs)
-fallback_llm = ChatOpenAI(model=LLM_FALLBACK_MODEL, **llm_common_kwargs)
-
-# Create an LLM with a fallback for resilience.
-# It will try primary_llm first, and if it fails (e.g., rate limit), it will try fallback_llm.
-llm = primary_llm.with_fallbacks([fallback_llm])
+# Create primary LLM instance
+llm = ChatOpenAI(model=LLM_MODEL, **llm_common_kwargs)
 
 # Bind tools to the LLM
 tools = [search_knowledge_base, get_ticket_status, create_ticket, escalate_to_human, add_ticket_reply]
@@ -60,7 +55,8 @@ def agent_node(state: AgentState):
             "   - To create a new support ticket for a new issue, you MUST call `create_ticket`.\n"
             "   - If the user wants to talk to a person for live help, you MUST call `escalate_to_human`.\n"
             "3. **NEVER answer from your own knowledge.** If a user's query can be answered by a tool, you MUST use the tool. Do not greet the user or ask for clarification. Immediately call the correct tool.\n"
-            "4. **Synthesize the Answer:** After receiving the output from a tool, create a helpful and conversational answer for the user based on the information provided by the tool. If the tool provides content from the knowledge base, present that information clearly. You MUST output a text response. NEVER return an empty message or blank response."
+            "4. **Synthesize the Answer:** After receiving the output from a tool, create a helpful and conversational answer for the user based on the information provided by the tool. If the tool provides content from the knowledge base, present that information clearly. You MUST output a text response. NEVER return an empty message or blank response.\n"
+            "5. **ANTI-HALLUCINATION RULE:** If a tool returns no relevant information, or if you cannot find the answer using a tool, you MUST clearly state that you do not know. Under NO circumstances should you fabricate, guess, or invent an answer. Do NOT make up ticket numbers or policy details."
         )
         messages_to_send = [SystemMessage(content=system_prompt)] + current_messages
     else:

@@ -4,8 +4,10 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# OpenAI / OpenRouter API Key
+# OpenAI / Groq API Key
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 # OpenRouter configuration
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
@@ -24,3 +26,6 @@ LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "google/gemma-4-31b-it:free
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nvidia/llama-nemotron-embed-vl-1b-v2:free")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "enterprise_knowledge")
 SEARCH_RESULT_LIMIT = int(os.getenv("SEARCH_RESULT_LIMIT", 3))
+
+# Security
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173").split(",")

@@ -1,18 +1,20 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from typing import Optional
 
 class ChatRequest(BaseModel):
-    message: str
-    session_id: str
-    attachment_data: Optional[str] = None
-    attachment_type: Optional[str] = None
+    message: str = Field(..., min_length=1, max_length=2000, description="The user's message")
+    session_id: str = Field(..., min_length=1, max_length=100, description="Unique session identifier")
+    attachment_data: Optional[str] = Field(None, description="Base64 encoded attachment data")
+    attachment_type: Optional[str] = Field(None, description="MIME type of the attachment")
 
 class ChatResponse(BaseModel):
+    status: str = "success"
     response: str
     session_id: str
 
 class DocumentUploadResponse(BaseModel):
+    status: str = "success"
     message: str
     filename: str
 
@@ -47,5 +49,9 @@ class TicketResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class TicketListResponse(BaseModel):
+    status: str = "success"
+    data: list[TicketResponse]
+
 class TicketUpdateRequest(BaseModel):
-    status: str
+    status: str = Field(..., description="The new status of the ticket")

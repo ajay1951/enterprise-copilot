@@ -7,36 +7,28 @@ from pathlib import Path
 from typing import List, Dict, Any
 import threading
 from uuid import uuid4
-from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from unstructured.partition.auto import partition
 from unstructured.documents.elements import Image, Table
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import models as qdrant_models
 from app.config import (
     QDRANT_URL,
     QDRANT_API_KEY,
     COLLECTION_NAME,
     EMBEDDING_MODEL,
-    OPENAI_API_KEY,
-    USE_OPENROUTER,
-    OPENROUTER_BASE_URL,
+    HF_TOKEN,
     SEARCH_RESULT_LIMIT,
 )
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
 
-# Prepare arguments for OpenAIEmbeddings
-embeddings_args = {
-    "model": EMBEDDING_MODEL,
-    "openai_api_key": OPENAI_API_KEY,
-}
-# When using a non-OpenAI provider like OpenRouter, we must bypass the
-# default token counting behavior as recommended by the LangChain documentation.
-if USE_OPENROUTER:
-    embeddings_args["base_url"] = OPENROUTER_BASE_URL
-    embeddings_args["check_embedding_ctx_length"] = False
-
-embeddings_client = OpenAIEmbeddings(**embeddings_args)
+# Use HuggingFace Inference API for embeddings (cloud-based, free)
+embeddings_client = HuggingFaceEndpointEmbeddings(
+    huggingfacehub_api_token=HF_TOKEN,
+    model=EMBEDDING_MODEL,
+)
 
 _EMBEDDING_VECTOR_SIZE = None
 
@@ -270,18 +262,20 @@ def ingest_document(title: str, file_path: str, original_filename: str):
             })
         else:
             current_text += str(el) + "\n\n"
-            if len(current_text) > 1000:
-                chunks.append({
-                    "text": current_text.strip(),
-                    "metadata": {"source": original_filename, "type": "text", "page": getattr(el.metadata, 'page_number', 1)}
-                })
-                current_text = ""
-                
+            
     if current_text.strip():
-        chunks.append({
-            "text": current_text.strip(),
-            "metadata": {"source": original_filename, "type": "text", "page": getattr(elements[-1].metadata if elements else None, 'page_number', 1)}
-        })
+        # Use a proper recursive character text splitter with overlap
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            separators=["\n\n", "\n", ".", " ", ""]
+        )
+        split_texts = text_splitter.split_text(current_text.strip())
+        for split_text in split_texts:
+            chunks.append({
+                "text": split_text,
+                "metadata": {"source": original_filename, "type": "text", "page": getattr(elements[-1].metadata if elements else None, 'page_number', 1)}
+            })
         
     logger.info(f"Extracted {len(chunks)} chunks (text, tables, images) from {original_filename}")
     

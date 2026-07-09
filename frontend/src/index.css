@@ -4,26 +4,14 @@
   --font-sans: 'Geist', 'SF Pro Display', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   
-  --color-canvas: #02040A;
-  --color-panel: rgba(255, 255, 255, 0.03);
-  --color-panel-border: rgba(255, 255, 255, 0.1);
+  --color-canvas: #020617; /* slate-950 */
+  --color-panel: #0F172A; /* slate-900 */
+  --color-panel-border: rgba(255, 255, 255, 0.05); /* white/5 */
   --color-neon-purple: #A855F7;
   --color-neon-indigo: #6366F1;
 
-  --animate-pulse-glow: pulse-glow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   --animate-float: float 6s ease-in-out infinite;
   --animate-sweep: sweep 2s linear infinite;
-
-  @keyframes pulse-glow {
-    0%, 100% {
-      opacity: 1;
-      box-shadow: 0 0 15px rgba(99, 102, 241, 0.5);
-    }
-    50% {
-      opacity: .5;
-      box-shadow: 0 0 5px rgba(99, 102, 241, 0.2);
-    }
-  }
 
   @keyframes float {
     0% { transform: translateY(0px); }
@@ -122,14 +110,12 @@ body {
 /* Sci-fi specific utilities */
 .glass-panel {
   background: var(--color-panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--color-panel-border);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
 }
 
 .glass-panel:hover {
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .glow-text {

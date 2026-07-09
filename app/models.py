@@ -33,10 +33,10 @@ class TicketMessage(Base):
     __tablename__ = "ticket_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True)
     sender = Column(Enum(SenderRole), nullable=False)
     message = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
 
     ticket = relationship("Ticket", back_populates="messages")
 
@@ -46,12 +46,12 @@ class Ticket(Base):
     id = Column(Integer, primary_key=True, index=True)
     # Human-readable ticket number (e.g. TICKET-1234)
     ticket_number = Column(String, unique=True, index=True, nullable=False)
-    user_email = Column(String, nullable=True) # Nullable for backward compatibility
+    user_email = Column(String, nullable=True, index=True) # Nullable for backward compatibility
     summary = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(Enum(TicketStatus), default=TicketStatus.OPEN, nullable=False)
-    priority = Column(Enum(TicketPriority), default=TicketPriority.MEDIUM, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(Enum(TicketStatus), default=TicketStatus.OPEN, nullable=False, index=True)
+    priority = Column(Enum(TicketPriority), default=TicketPriority.MEDIUM, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     resolution = Column(Text, nullable=True)
     assigned_to = Column(String, nullable=True)
