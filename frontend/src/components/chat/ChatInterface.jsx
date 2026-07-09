@@ -50,16 +50,54 @@ function ChatInterface() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/chat', {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+      const response = await fetch(`${apiUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
 
-      setMessages((prev) => [...prev, { content: data.response, role: 'ai' }]);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      
+      let aiMessageContent = "";
+      setMessages((prev) => [...prev, { content: "", role: 'ai' }]);
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const dataStr = line.slice(6);
+            if (dataStr === '[DONE]') break;
+            
+            try {
+              const data = JSON.parse(dataStr);
+              if (data.error) {
+                toast.error(data.error);
+                setMessages((prev) => [...prev, { content: 'ERROR: ' + data.error, role: 'error' }]);
+                break;
+              }
+              if (data.text) {
+                aiMessageContent += data.text;
+                setMessages((prev) => {
+                  const newMessages = [...prev];
+                  newMessages[newMessages.length - 1].content = aiMessageContent;
+                  return newMessages;
+                });
+              }
+            } catch (e) {
+              // Ignore partial JSON chunks if they split awkwardly, though rare with our backend setup
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to connect to the server.');
@@ -114,27 +152,23 @@ function ChatInterface() {
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4 lg:p-6 overflow-hidden h-full relative">
-      {/* Intense background glow for chat */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none" />
+    <div className="flex-1 flex flex-col items-center justify-center overflow-hidden h-full relative">
 
-      <div className="w-full max-w-5xl flex-1 min-h-0 flex flex-col glass-panel rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden relative z-10 border-t border-white/20">
+      <div className="w-full h-full flex flex-col overflow-hidden relative z-10 bg-slate-950">
 
-        <header className="px-8 py-9 border-b border-white/10 bg-black/30 flex items-center justify-between relative backdrop-blur-xl">
-          <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent"></div>
+        <header className="px-8 py-8 border-b border-white/5 bg-slate-900/40 flex items-center justify-between relative backdrop-blur-xl">
 
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500 rounded-xl blur-md opacity-50 animate-pulse-glow"></div>
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center border border-white/20 relative z-10">
+              <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center border border-indigo-500/50 relative z-10">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
               </div>
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-50 tracking-tight flex items-center gap-2">
                 Enterprise Copilot
               </h2>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-emerald-400 uppercase tracking-widest mt-0.5">
+              <div className="flex items-center gap-2 text-[10px] font-mono text-emerald-400 uppercase tracking-widest mt-1">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -144,25 +178,24 @@ function ChatInterface() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-indigo-500/20 rounded-full blur-md opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <div className="hidden md:flex items-center gap-4">
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search history..."
-                className="bg-black/50 border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner w-48 relative z-10"
+                className="bg-slate-900 border border-white/5 rounded-md pl-9 pr-4 py-1.5 text-xs text-slate-50 placeholder-slate-500 focus:outline-none focus:border-indigo-600 transition-all w-56 relative z-10"
               />
             </div>
-            <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/50 text-xs font-mono">
-              SESSION: {sessionInfo.id.split('-')[1].toUpperCase()}
+            <div className="px-3 py-1.5 rounded-md bg-slate-900 border border-white/5 text-slate-400 text-[10px] font-bold tracking-widest uppercase font-mono">
+              SESSION: {sessionInfo.id.split('-')[1]}
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-8 bg-black/20">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-6 bg-slate-950 w-full max-w-5xl mx-auto">
           <AnimatePresence>
             {messages.filter(msg => msg.content.toLowerCase().includes(searchQuery.toLowerCase())).map((msg, idx) => (
               <motion.div
@@ -171,11 +204,11 @@ function ChatInterface() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`max-w-[85%] px-6 py-5 rounded-3xl relative group ${msg.role === 'user'
-                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-white rounded-br-none shadow-[0_0_20px_rgba(99,102,241,0.05)] backdrop-blur-md'
+                <div className={`max-w-[85%] px-5 py-4 rounded-lg relative group transition-all duration-300 ease-out ${msg.role === 'user'
+                  ? 'bg-slate-900 border border-white/5 text-slate-50'
                   : msg.role === 'error'
-                    ? 'bg-red-500/10 border border-red-500/30 text-red-400 rounded-bl-none shadow-[0_0_20px_rgba(248,113,113,0.1)]'
-                    : 'bg-black/40 border border-white/10 text-white rounded-bl-none shadow-[0_4px_30px_rgba(0,0,0,0.1)] backdrop-blur-md'
+                    ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                    : 'bg-slate-900 border border-white/5 text-slate-50'
                   }`}>
 
                   {/* Meta header for bubbles */}
@@ -218,14 +251,14 @@ function ChatInterface() {
                 exit={{ opacity: 0 }}
                 className="flex justify-start"
               >
-                <div className="bg-black/40 border border-white/10 px-6 py-5 rounded-3xl rounded-bl-none flex flex-col gap-3 backdrop-blur-md">
-                  <div className="font-bold text-[9px] uppercase tracking-widest font-mono text-purple-300 flex items-center gap-2">
+                <div className="bg-slate-900 border border-white/5 px-5 py-4 rounded-lg flex flex-col gap-3">
+                  <div className="font-bold text-[9px] uppercase tracking-widest font-mono text-indigo-400 flex items-center gap-2">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon></svg> AI Matrix
                   </div>
                   <div className="flex gap-2 items-center h-6">
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce shadow-[0_0_8px_rgba(168,85,247,0.8)]" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce shadow-[0_0_8px_rgba(99,102,241,0.8)]" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce shadow-[0_0_8px_rgba(168,85,247,0.8)]" style={{ animationDelay: '300ms' }}></div>
+                    <div className="w-2 h-2 bg-indigo-500 rounded-sm animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-indigo-400 rounded-sm animate-pulse" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-indigo-300 rounded-sm animate-pulse" style={{ animationDelay: '300ms' }}></div>
                   </div>
                 </div>
               </motion.div>
@@ -234,31 +267,29 @@ function ChatInterface() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-4 md:p-6 bg-black/40 border-t border-white/10 backdrop-blur-2xl relative">
-          {/* Top glow on input area */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-
-          {/* Floating Action Button */}
-          <div className="absolute -top-16 right-6 z-20 group/tooltip">
-            <button
-              type="button"
-              aria-label="Quick Attach"
-              onClick={() => chatAttachmentRef.current.click()}
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.5)] border border-white/20 hover:scale-110 transition-transform group"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:rotate-90 transition-transform duration-300"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            </button>
-            <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/80 backdrop-blur-md border border-white/10 rounded-lg text-[10px] font-bold text-white whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none shadow-xl uppercase tracking-wider">
-              Upload Data
-            </div>
+        <div className="p-4 bg-slate-900 border-t border-white/5 relative z-20">
+          
+          <div className="max-w-5xl mx-auto flex flex-col relative gap-2">
+            <div className="absolute -top-14 right-4 z-20 group/tooltip">
+              <button
+                type="button"
+                aria-label="Quick Attach"
+                onClick={() => chatAttachmentRef.current.click()}
+                className="w-10 h-10 rounded-md bg-indigo-600 flex items-center justify-center border border-indigo-500/50 hover:bg-indigo-500 transition-colors group"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 border border-white/5 rounded-md text-[10px] font-bold text-slate-50 whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none uppercase tracking-wider">
+                Upload Data
+              </div>
           </div>
 
-          <form onSubmit={handleSendMessage} className="relative max-w-4xl mx-auto flex flex-col gap-3">
+          <form onSubmit={handleSendMessage} className="relative w-full flex flex-col gap-3">
             {chatAttachment && (
-              <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/30 px-4 py-2 rounded-xl w-max ml-2 shadow-[0_0_15px_rgba(99,102,241,0.15)] animate-fade-in">
+              <div className="flex items-center gap-2 bg-slate-800 border border-white/5 px-3 py-1.5 rounded-md w-max ml-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-indigo-400"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
                 <span className="text-xs font-mono text-indigo-300 font-bold truncate max-w-[200px]">{chatAttachment.name}</span>
-                <button type="button" aria-label="Remove Attachment" onClick={() => setChatAttachment(null)} className="text-white/40 hover:text-red-400 ml-2 transition-colors">
+                <button type="button" aria-label="Remove Attachment" onClick={() => setChatAttachment(null)} className="text-slate-400 hover:text-red-400 ml-2 transition-colors duration-300">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
               </div>
@@ -268,18 +299,16 @@ function ChatInterface() {
               <button
                 type="button"
                 aria-label="Upload Attachment"
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 text-white/50 hover:text-white hover:bg-white/10 rounded-full flex items-center justify-center transition-all z-10"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 text-slate-500 hover:text-slate-50 hover:bg-slate-800 rounded-md flex items-center justify-center transition-colors z-10"
                 onClick={() => chatAttachmentRef.current.click()}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
               </button>
               <input type="file" ref={chatAttachmentRef} onChange={handleChatAttachmentSelect} accept="image/*" className="hidden" />
 
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-full blur-md opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none"></div>
-
               <input
                 type="text"
-                className="w-full bg-black/50 border border-white/10 rounded-full pl-14 pr-16 py-4 md:py-5 text-sm md:text-base text-white placeholder-white/30 focus:outline-none focus:border-indigo-500/50 focus:bg-white/5 transition-all shadow-inner relative z-0"
+                className="w-full bg-slate-950 border border-white/5 rounded-md pl-12 pr-14 py-3 text-sm text-slate-50 placeholder-slate-500 focus:outline-none focus:border-indigo-600 transition-colors z-0"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 placeholder="Initialize query or upload visual data..."
@@ -289,14 +318,15 @@ function ChatInterface() {
               <button
                 type="submit"
                 aria-label="Send Message"
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 bg-white text-black hover:bg-indigo-400 disabled:bg-white/10 disabled:text-white/30 rounded-full flex items-center justify-center transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] disabled:shadow-none z-10"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 rounded-md flex items-center justify-center transition-colors z-10"
                 disabled={isLoading || (!inputMessage.trim() && !chatAttachment)}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
               </button>
             </div>
           </form>
-          <div className="text-center mt-4 text-[10px] font-mono text-white/30 uppercase tracking-widest">Neural matrix may produce artifacts. Verify critical data.</div>
+          <div className="text-center mt-3 text-[10px] font-mono text-slate-500 uppercase tracking-widest">Neural matrix may produce artifacts. Verify critical data.</div>
+          </div>
         </div>
       </div>
     </div>
