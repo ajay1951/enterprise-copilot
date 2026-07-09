@@ -1,8 +1,10 @@
 from langchain.tools import tool
 from typing import List, Dict, Any, Optional, Literal
 from app.vector_store import perform_vector_search
-from app.database import SessionLocal
+from app.database import SessionLocal, get_db_session
 from app.models import Ticket, TicketStatus, TicketPriority, TicketMessage, SenderRole
+from app.repositories.ticket_repository import TicketRepository
+from app.services.ticket_service import TicketService
 
 @tool
 def search_knowledge_base(query: str) -> str:
@@ -37,15 +39,15 @@ def get_ticket_status(ticket_id: str) -> str:
     Use this tool when the user provides a ticket ID and wants to know its status, updates, or resolution.
     Returns a formatted string containing ticket details.
     """
-    # Use real DB connection
-    db = SessionLocal()
-    try:
-        ticket = db.query(Ticket).filter(Ticket.ticket_number == ticket_id).first()
+    # Use safe context manager for DB connections
+    with get_db_session() as db:
+        repo = TicketRepository(db)
+        ticket = repo.get_by_ticket_number(ticket_id)
         if not ticket:
             return f"Ticket with ID '{ticket_id}' was not found in the system."
             
         message_history = ""
-        messages = db.query(TicketMessage).filter(TicketMessage.ticket_id == ticket.id).order_by(TicketMessage.timestamp.asc()).all()
+        messages = repo.get_messages(ticket.id)
         if messages:
             message_history = "\n\nChat History:"
             for msg in messages:
@@ -61,8 +63,6 @@ def get_ticket_status(ticket_id: str) -> str:
             + (f"\n- Resolution: {ticket.resolution}" if ticket.resolution else "")
             + message_history
         )
-    finally:
-        db.close()
 
 @tool
 def create_ticket(email: str, summary: str, priority: Literal["low", "medium", "high"] = "medium") -> str:
@@ -73,8 +73,8 @@ def create_ticket(email: str, summary: str, priority: Literal["low", "medium", "
     Provide the user's email, a summary of the problem, and optionally set a priority.
     Returns a confirmation message with the new ticket number.
     """
-    db = SessionLocal()
-    try:
+    with get_db_session() as db:
+        repo = TicketRepository(db)
         ticket_number = Ticket.generate_ticket_number()
         new_ticket = Ticket(
             ticket_number=ticket_number,
@@ -82,17 +82,13 @@ def create_ticket(email: str, summary: str, priority: Literal["low", "medium", "
             summary=summary,
             priority=TicketPriority(priority)
         )
-        db.add(new_ticket)
-        db.commit()
-        db.refresh(new_ticket)
+        repo.create_ticket(new_ticket)
         
         print(f"TICKET CREATED: {ticket_number} with priority '{priority}' and summary: {summary}")
         return (
             f"Successfully created ticket {ticket_number} with priority '{priority}'. "
             f"A support agent will be in touch shortly. The summary of your issue is: '{summary}'"
         )
-    finally:
-        db.close()
 
 @tool
 def escalate_to_human(email: str, summary: str) -> str:
@@ -104,8 +100,8 @@ def escalate_to_human(email: str, summary: str) -> str:
     Provide the user's email and a summary of the issue and steps taken so far.
     Returns a confirmation message that the escalation was successful.
     """
-    db = SessionLocal()
-    try:
+    with get_db_session() as db:
+        repo = TicketRepository(db)
         ticket_number = f"ESC-{Ticket.generate_ticket_number().split('-')[1]}"
         new_ticket = Ticket(
             ticket_number=ticket_number,
@@ -114,13 +110,10 @@ def escalate_to_human(email: str, summary: str) -> str:
             priority=TicketPriority.HIGH,
             status=TicketStatus.IN_PROGRESS
         )
-        db.add(new_ticket)
-        db.commit()
+        repo.create_ticket(new_ticket)
         
         print(f"ESCALATION: Ticket {ticket_number} created with summary: {summary}")
         return f"Escalation successful. A human agent will review the following summary and contact you shortly. Reference ticket: {ticket_number}\nSummary: {summary}"
-    finally:
-        db.close()
 
 @tool
 def add_ticket_reply(ticket_id: str, message: str) -> str:
@@ -129,9 +122,9 @@ def add_ticket_reply(ticket_id: str, message: str) -> str:
     Use this tool when the user asks to reply, add information, or respond to an admin on a specific ticket.
     Returns a confirmation message.
     """
-    db = SessionLocal()
-    try:
-        ticket = db.query(Ticket).filter(Ticket.ticket_number == ticket_id).first()
+    with get_db_session() as db:
+        repo = TicketRepository(db)
+        ticket = repo.get_by_ticket_number(ticket_id)
         if not ticket:
             return f"Error: Ticket with ID '{ticket_id}' was not found in the system."
         
@@ -140,13 +133,11 @@ def add_ticket_reply(ticket_id: str, message: str) -> str:
             sender=SenderRole.USER,
             message=message
         )
-        db.add(new_msg)
+        repo.add_message(new_msg)
         
         # Change status if it was pending user response
         if ticket.status == TicketStatus.PENDING_USER:
             ticket.status = TicketStatus.OPEN
+            repo.update_ticket(ticket)
             
-        db.commit()
         return f"Successfully added your reply to ticket {ticket_id}."
-    finally:
-        db.close()
