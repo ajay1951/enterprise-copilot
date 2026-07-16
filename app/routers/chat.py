@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
-from fastapi_limiter.depends import RateLimiter
+from app.rate_limiter import RateLimiter
 from app.schemas import ChatRequest, ChatResponse
 from app.exceptions import AIProcessingError
 from app.agent import agent as agent_app
@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 from fastapi.responses import StreamingResponse
 import json
 
-@router.post("/chat", dependencies=[Depends(RateLimiter(times=20, seconds=60))])
-async def chat_endpoint(fastapi_request: Request, request: ChatRequest):
+@router.post("/chat")
+async def chat_endpoint(fastapi_request: Request, request: ChatRequest, _=Depends(RateLimiter(times=20, seconds=60))):
     """
     Handle a chat request from the user and stream the response via Server-Sent Events (SSE).
     """

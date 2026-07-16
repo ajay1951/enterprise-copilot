@@ -34,10 +34,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import redis.asyncio as redis
-from fastapi_limiter import FastAPILimiter
+from app.rate_limiter import init_redis
 
-# We will initialize FastAPILimiter in the startup event.
+# We will initialize Redis in the startup event.
 
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException
@@ -86,10 +85,8 @@ async def startup_event():
     """Initialize the Qdrant collection, DB, and Redis Rate Limiter on startup."""
     try:
         # Initialize Redis for rate limiting
-        redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
-        redis_conn = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
-        await FastAPILimiter.init(redis_conn)
-        logger.info("Redis Rate Limiter initialized successfully")
+        await init_redis()
+        logger.info("Custom Redis Rate Limiter initialized successfully")
 
         logger.info("Database verification delegated to Alembic migrations.")
         
