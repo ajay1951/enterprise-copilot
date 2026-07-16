@@ -37,6 +37,10 @@ services:
       - LANGCHAIN_TRACING_V2=true
       - LANGCHAIN_PROJECT=EnterpriseCopilot
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     depends_on:
       - postgres
       - qdrant
@@ -52,6 +56,10 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/enterprise_copilot
       - QDRANT_URL=http://qdrant:6333
       - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
     depends_on:
       - redis
       - postgres
