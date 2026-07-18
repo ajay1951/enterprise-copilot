@@ -1,5 +1,21 @@
 version: '3.8'
 services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file:
+      - .env
+    depends_on:
+      - frontend
+      - backend
   qdrant:
     image: qdrant/qdrant
     ports:
@@ -25,8 +41,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
     env_file:
       - .env
     environment:
@@ -68,7 +82,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "80:80"
     depends_on:
       - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

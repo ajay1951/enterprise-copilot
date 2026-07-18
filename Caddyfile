@@ -1,0 +1,14 @@
+{$DOMAIN} {
+    # Serve the React frontend from the Nginx container
+    reverse_proxy /* frontend:80
+
+    # Reverse proxy the backend API
+    reverse_proxy /chat* backend:8000
+    reverse_proxy /upload* backend:8000
+    reverse_proxy /health* backend:8000
+    reverse_proxy /admin/* backend:8000
+    
+    # OpenAPI Docs
+    reverse_proxy /docs* backend:8000
+    reverse_proxy /openapi.json* backend:8000
+}

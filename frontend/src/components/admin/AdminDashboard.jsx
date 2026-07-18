@@ -41,7 +41,7 @@ function AdminDashboard({ adminToken, setAdminToken }) {
   const handleAdminLogin = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:8000/admin/login', {
+      const res = await fetch('/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: adminUsername, password: adminPassword })
@@ -60,7 +60,7 @@ function AdminDashboard({ adminToken, setAdminToken }) {
   const fetchTickets = async (token) => {
     setIsLoadingTickets(true);
     try {
-      const res = await fetch('http://localhost:8000/admin/tickets', {
+      const res = await fetch('/admin/tickets', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -77,7 +77,7 @@ function AdminDashboard({ adminToken, setAdminToken }) {
 
   const handleUpdateTicket = async (id, status) => {
     try {
-      await fetch(`http://localhost:8000/admin/tickets/${id}`, {
+      await fetch(`/admin/tickets/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
         body: JSON.stringify({ status })
@@ -92,7 +92,7 @@ function AdminDashboard({ adminToken, setAdminToken }) {
   const handleBulkResolve = async () => {
     try {
       await Promise.all(selectedTickets.map(id => 
-        fetch(`http://localhost:8000/admin/tickets/${id}`, {
+        fetch(`/admin/tickets/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
           body: JSON.stringify({ status: 'resolved' })
@@ -116,7 +116,7 @@ function AdminDashboard({ adminToken, setAdminToken }) {
     setSelectedTicketForChat(ticket);
     setShowAuditTrail(false);
     try {
-      const res = await fetch(`http://localhost:8000/admin/tickets/${ticket.id}/messages`, {
+      const res = await fetch(`/admin/tickets/${ticket.id}/messages`, {
         headers: { 'Authorization': `Bearer ${adminToken}` }
       });
       if (res.ok) {
@@ -133,7 +133,7 @@ function AdminDashboard({ adminToken, setAdminToken }) {
     e.preventDefault();
     if (!adminChatMessage.trim() || !selectedTicketForChat) return;
     try {
-      await fetch(`http://localhost:8000/admin/tickets/${selectedTicketForChat.id}/reply`, {
+      await fetch(`/admin/tickets/${selectedTicketForChat.id}/reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
         body: JSON.stringify({ message: adminChatMessage })
@@ -157,7 +157,7 @@ function AdminDashboard({ adminToken, setAdminToken }) {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/upload-document', {
+      const response = await fetch('/upload-document', {
         method: 'POST',
         body: formData,
       });
